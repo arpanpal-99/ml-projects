@@ -23,3 +23,6 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# Additional references
+Reference/
