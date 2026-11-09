@@ -1,8 +1,9 @@
 # Movie Recommendation System
 
 A small, local-first teaching project that recommends movies using basic
-content-based machine learning. It keeps the implementation in one Python file
-and does not save generated model artifacts.
+content-based machine learning. The Streamlit interface is separate from the
+data-processing and recommendation pipeline, and no generated model artifacts
+are saved.
 
 ## Run on Windows
 
@@ -52,8 +53,9 @@ movie's scores at a time instead of storing a full all-pairs similarity matrix.
 
 ## Project files
 
-- `app.py` - data loading, feature engineering, similarity ranking, and a minimal
-  Streamlit page.
+- `app.py` - Streamlit interface, styling, and movie detail display.
+- `ml_pipeline.py` - dataset loading, feature engineering, and recommendation
+  ranking.
 - `requirements.txt` - the direct runtime dependencies.
 - `data/raw/.gitkeep` - keeps the local dataset directory visible without
   committing the dataset.
