@@ -15,8 +15,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
-from src.config import Settings
-from src.recommender.artifacts import ArtifactError, load_artifacts
+from ml_pipeline import load_recommender as load_movie_recommender
+from ml_pipeline import recommend_movies
+from src.recommender.artifacts import ArtifactError
 from src.recommender.engine import MovieRecommender
 from src.services.tmdb_client import TMDBClient
 from src.ui_components import (
@@ -31,7 +32,6 @@ from src.ui_components import (
 )
 from src.utils.logging_config import configure_logging
 
-
 load_dotenv()
 configure_logging()
 
@@ -45,13 +45,13 @@ st.set_page_config(
 
 @st.cache_resource(show_spinner=False)
 def load_recommender() -> MovieRecommender:
-    settings = Settings.from_environment()
-    movies, vectorizer, matrix = load_artifacts(settings.artifacts_dir)
-    return MovieRecommender(movies, vectorizer, matrix)
+    """Cache the model between Streamlit reruns; model loading lives in ml_pipeline."""
+    return load_movie_recommender()
 
 
 @st.cache_resource
 def load_tmdb_client() -> TMDBClient:
+    """Create the cached optional TMDB client from environment or Streamlit secrets."""
     api_key = os.getenv("TMDB_API_KEY")
     secrets_files = (
         Path(__file__).resolve().parent / ".streamlit" / "secrets.toml",
@@ -62,6 +62,8 @@ def load_tmdb_client() -> TMDBClient:
     return TMDBClient(api_key=api_key)
 
 
+# Streamlit reruns this module after interactions, so transient choices are stored
+# in session_state rather than module globals or a user database.
 _STATE_DEFAULTS: dict[str, object] = {
     "active_movie_id": None,
     "show_next_watch": False,
@@ -94,22 +96,26 @@ _LOADING_PRESENTATIONS: dict[str, tuple[str, str]] = {
 
 
 def _init_session_state() -> None:
+    """Initialize each session key once, copying mutable defaults per session."""
     for key, value in _STATE_DEFAULTS.items():
         if key not in st.session_state:
             st.session_state[key] = value.copy() if isinstance(value, list) else value
 
 
 def _record(movie: pd.Series | dict[str, Any] | None) -> dict[str, Any] | None:
+    """Convert a catalogue row into a plain dictionary for UI rendering."""
     if movie is None:
         return None
     return movie.to_dict() if isinstance(movie, pd.Series) else dict(movie)
 
 
 def _movie(recommender: MovieRecommender, movie_id: int) -> dict[str, Any] | None:
+    """Look up one catalogue movie and return its UI-friendly record."""
     return _record(recommender.get_movie(int(movie_id)))
 
 
 def _movie_label(movie_id: int, recommender: MovieRecommender) -> str:
+    """Format a search option with title, year, and rating for disambiguation."""
     movie = _movie(recommender, movie_id)
     if movie is None:
         return f"Unknown movie ({movie_id})"
@@ -120,6 +126,7 @@ def _movie_label(movie_id: int, recommender: MovieRecommender) -> str:
 
 
 def _valid_ids(recommender: MovieRecommender, state_key: str) -> list[int]:
+    """Drop invalid, duplicate, or no-longer-catalogued IDs from session state."""
     available = {int(movie_id) for movie_id in recommender.movies["id"].tolist()}
     valid: list[int] = []
     for raw_id in st.session_state.get(state_key, []):
@@ -135,6 +142,7 @@ def _valid_ids(recommender: MovieRecommender, state_key: str) -> list[int]:
 
 
 def _remember_recent(movie_id: int) -> None:
+    """Move a selected movie to the front of the short session history."""
     current = [int(item) for item in st.session_state.get("recent_movie_ids", [])]
     st.session_state["recent_movie_ids"] = [movie_id] + [
         item for item in current if item != movie_id
@@ -143,6 +151,7 @@ def _remember_recent(movie_id: int) -> None:
 
 
 def _set_notice(message: str) -> None:
+    """Queue a one-time notice for display on the next Streamlit rerun."""
     st.session_state["notice"] = message
 
 
@@ -162,12 +171,14 @@ def _activate_movie(movie_id: int) -> None:
 
 
 def _activate_selected_movie() -> None:
+    """Use the current search selection as the recommendation seed."""
     selected_id = st.session_state.get("movie-picker")
     if selected_id is not None:
         _activate_movie(int(selected_id))
 
 
 def _open_selected_movie_details() -> None:
+    """Open the selected title's profile unless the picker changed programmatically."""
     selected_id = st.session_state.get("movie-picker")
     activated_picker_value = st.session_state.pop("picker_value_set_by_activation", None)
     if selected_id is not None and selected_id == activated_picker_value:
@@ -186,6 +197,7 @@ def _open_selected_movie_details() -> None:
 
 
 def _open_movie_details(movie_id: int, return_target: str) -> None:
+    """Queue a card-triggered details dialog and remember its originating section."""
     st.session_state["loading_action"] = "card-details"
     st.session_state["details_movie_id"] = int(movie_id)
     st.session_state["details_return_target"] = return_target
@@ -193,6 +205,7 @@ def _open_movie_details(movie_id: int, return_target: str) -> None:
 
 
 def _toggle_collection(collection_key: str, movie_id: int, add_message: str, remove_message: str) -> None:
+    """Add or remove a movie ID in a named session-only collection."""
     movie_id = int(movie_id)
     ids = [int(item) for item in st.session_state.get(collection_key, [])]
     if movie_id in ids:
@@ -204,6 +217,7 @@ def _toggle_collection(collection_key: str, movie_id: int, add_message: str, rem
 
 
 def _toggle_saved(movie_id: int) -> None:
+    """Toggle a movie in the user's session-only saved list."""
     _toggle_collection(
         "saved_movie_ids",
         movie_id,
@@ -213,12 +227,14 @@ def _toggle_saved(movie_id: int) -> None:
 
 
 def _is_saved(movie_id: int) -> bool:
+    """Check whether a movie is currently in the saved list."""
     return int(movie_id) in {
         int(saved_id) for saved_id in st.session_state.get("saved_movie_ids", [])
     }
 
 
 def _toggle_liked(movie_id: int) -> None:
+    """Toggle a movie in the session-only taste profile."""
     _toggle_collection(
         "liked_movie_ids",
         movie_id,
@@ -228,11 +244,13 @@ def _toggle_liked(movie_id: int) -> None:
 
 
 def _advance_shelf() -> None:
+    """Refresh the discovery seed so both home-page shelves rotate."""
     _refresh_discovery_seed()
     _set_notice("Here are a few more great choices.")
 
 
 def _surprise_me(candidate_ids: Iterable[int]) -> None:
+    """Choose the next popular candidate and open its details as a recommendation."""
     ids = [int(movie_id) for movie_id in candidate_ids]
     if not ids:
         _set_notice("There are no titles available for a surprise pick yet.")
@@ -248,6 +266,7 @@ def _surprise_me(candidate_ids: Iterable[int]) -> None:
 
 
 def _clear_collection(collection_key: str, message: str) -> None:
+    """Clear a session collection and queue confirmation feedback."""
     st.session_state[collection_key] = []
     _set_notice(message)
 
@@ -288,6 +307,7 @@ def _scroll_to(target_id: str) -> None:
 
 
 def _section_intro(anchor: str, kicker: str, title: str, description: str) -> None:
+    """Render a consistent accessible heading block for a page section."""
     st.markdown(
         "<div "
         f"id='{html.escape(anchor, quote=True)}' class='cm-section-intro cm-anchor' tabindex='-1'>"
@@ -350,12 +370,14 @@ def _animate_overflowing_card_titles() -> None:
 
 
 def _refresh_discovery_seed() -> int:
+    """Generate and store a new seed for reproducible random discovery shelves."""
     seed = random.SystemRandom().randrange(0, 2**32)
     st.session_state["discovery_seed"] = seed
     return seed
 
 
 def _discovery_seed() -> int:
+    """Return the current shelf seed, creating one if session state lacks it."""
     seed = st.session_state.get("discovery_seed")
     if not isinstance(seed, int):
         return _refresh_discovery_seed()
@@ -371,6 +393,7 @@ def _random_rated_movies(
     count: int = 8,
     genres: Iterable[str] | None = None,
 ) -> pd.DataFrame:
+    """Sample above-threshold, optionally genre-filtered movies with poster art."""
     movies = recommender.movies.copy()
     ratings = pd.to_numeric(
         movies.get("vote_average", pd.Series(index=movies.index, dtype=float)),
@@ -413,6 +436,7 @@ def _random_top_picks(
     genre: str | None = None,
     count: int = 8,
 ) -> tuple[pd.DataFrame, list[str]]:
+    """Select a deterministic genre mix and sample its highly rated movies."""
     available_genres = recommender.genres()
     rng = random.Random(seed)
     if genre is not None:
@@ -447,6 +471,7 @@ def _render_cards(
     primary_label: str = "Find similar",
     featured_detail_keys: bool = False,
 ) -> None:
+    """Render movie cards with match explanations and session action state."""
     records = movies.to_dict("records")
     saved_ids = set(st.session_state.get("saved_movie_ids", []))
     liked_ids = set(st.session_state.get("liked_movie_ids", []))
@@ -486,6 +511,7 @@ def _render_cards(
 
 
 def _render_nav(saved_count: int) -> None:
+    """Render the top navigation links and current saved-list count."""
     st.markdown(
         f"""
         <nav class="cm-nav" aria-label="CineMatch navigation">
@@ -503,6 +529,7 @@ def _render_nav(saved_count: int) -> None:
 
 
 def _render_hero(catalogue_size: int) -> None:
+    """Render the landing-page introduction and catalogue summary."""
     st.markdown(
         f"""
         <div id="page-top" class="cm-hero">
@@ -526,6 +553,7 @@ def _render_hero(catalogue_size: int) -> None:
 
 
 def _render_notice() -> None:
+    """Display and consume any queued session notice."""
     notice = st.session_state.pop("notice", None)
     if notice:
         # Decorative glyphs are not valid Streamlit toast icons. A text-only
@@ -534,6 +562,7 @@ def _render_notice() -> None:
 
 
 def _render_search(recommender: MovieRecommender, surprise_ids: list[int]) -> int | None:
+    """Render movie search, recommendation activation, and surprise controls."""
     st.markdown('<div id="search-panel" class="cm-anchor" tabindex="-1"></div>', unsafe_allow_html=True)
     with st.container(border=True, key="movie-search-panel"):
         st.markdown('<div class="cm-label">Start with a film you know</div>', unsafe_allow_html=True)
@@ -603,6 +632,7 @@ def _render_search(recommender: MovieRecommender, surprise_ids: list[int]) -> in
 
 
 def _render_recently_explored(recommender: MovieRecommender) -> None:
+    """Render recent recommendation seeds that are still present in the catalog."""
     recent_slot = st.empty()
     recent_ids = _valid_ids(recommender, "recent_movie_ids")
     if recent_ids:
@@ -643,6 +673,7 @@ def _render_recently_explored(recommender: MovieRecommender) -> None:
 
 @st.dialog("Movie details", width="large")
 def _render_details_dialog(movie_id: int) -> None:
+    """Render the selected movie's profile dialog and its seed/save actions."""
     if st.session_state.get("details_movie_id") != movie_id:
         st.rerun()
     recommender = load_recommender()
@@ -662,6 +693,7 @@ def _render_details_dialog(movie_id: int) -> None:
 
 
 def _selected_genre(recommender: MovieRecommender) -> str | None:
+    """Translate the genre selectbox label into the normalized genre key."""
     genre_keys = recommender.genres()
     selected_label = st.session_state.get("discovery-genre", "All genres")
     genre_labels = ["All genres", *[display_name(genre) for genre in genre_keys]]
@@ -671,11 +703,13 @@ def _selected_genre(recommender: MovieRecommender) -> str | None:
 
 
 def _begin_genre_selection() -> None:
+    """Refresh discovery results and show genre-specific loading feedback."""
     _refresh_discovery_seed()
     st.session_state["loading_action"] = "genre-selection"
 
 
 def _begin_recommendation_style_change() -> None:
+    """Choose contextual loading feedback for the selected ranking mode."""
     style_actions = {
         "Balanced": "style-balanced",
         "Closest match": "style-closest",
@@ -688,6 +722,7 @@ def _begin_recommendation_style_change() -> None:
 
 
 def _render_discovery(recommender: MovieRecommender, tmdb: TMDBClient) -> str | None:
+    """Render genre-filtered top picks and the all-catalogue popular shelf."""
     st.divider()
     _section_intro(
         "top-picks",
@@ -771,6 +806,7 @@ def _render_profile_recommendations(
     tmdb: TMDBClient,
     genre: str | None,
 ) -> None:
+    """Build and display recommendations from the user's liked titles."""
     liked_ids = _valid_ids(recommender, "liked_movie_ids")
     st.divider()
     _section_intro(
@@ -793,9 +829,10 @@ def _render_profile_recommendations(
     ]
     st.caption("Building from: " + " · ".join(liked_titles))
     try:
-        recommendations = recommender.recommend_for_movies(
+        recommendations = recommend_movies(
+            recommender,
             liked_ids,
-            k=8,
+            count=8,
             genre=genre,
             mode="balanced",
         )
@@ -826,6 +863,7 @@ def _render_active_recommendations(
     tmdb: TMDBClient,
     genre: str | None,
 ) -> None:
+    """Render the current seed's recommendation rail and ranking controls."""
     if not st.session_state.get("show_next_watch", False):
         return
     st.divider()
@@ -876,9 +914,10 @@ def _render_active_recommendations(
         "Closest match": "similar",
         "Hidden gems": "hidden_gems",
     }[mode_label]
-    recommendations = recommender.recommend_for_movies(
+    recommendations = recommend_movies(
+        recommender,
         [int(active_id)],
-        k=8,
+        count=8,
         genre=genre,
         mode=mode,
     )
@@ -904,6 +943,7 @@ def _render_active_recommendations(
 
 
 def _render_my_list(recommender: MovieRecommender, tmdb: TMDBClient) -> None:
+    """Render saved titles and actions for starting new recommendation trails."""
     saved_ids = _valid_ids(recommender, "saved_movie_ids")
     st.divider()
     _section_intro(
@@ -938,6 +978,7 @@ def _render_my_list(recommender: MovieRecommender, tmdb: TMDBClient) -> None:
 
 
 def _render_footer() -> None:
+    """Render the TMDB attribution and project disclaimer."""
     st.markdown(
         """
         <div class="cm-footer">
@@ -951,6 +992,7 @@ def _render_footer() -> None:
 
 
 def _render_application() -> None:
+    """Load project services and render the complete page in interaction order."""
     _init_session_state()
     try:
         recommender = load_recommender()
@@ -962,6 +1004,8 @@ def _render_application() -> None:
         return
     tmdb = load_tmdb_client()
 
+    # Validate session-held movie IDs against the current catalogue before using
+    # them; a rebuilt catalogue may no longer contain an earlier selection.
     _valid_ids(recommender, "saved_movie_ids")
     _valid_ids(recommender, "liked_movie_ids")
     _valid_ids(recommender, "recent_movie_ids")
@@ -997,6 +1041,7 @@ def _render_application() -> None:
 
 
 def _loading_presentation(action: str | None) -> tuple[str, str] | None:
+    """Map a session action name to its spinner message and visual category."""
     if action is None:
         return None
     return _LOADING_PRESENTATIONS.get(action)
@@ -1037,6 +1082,7 @@ def _style_loading_indicator(loading: tuple[str, str] | None) -> None:
 
 
 def main() -> None:
+    """Apply shared styles and render the app inside the contextual spinner."""
     apply_product_styles()
     loading_action = st.session_state.pop("loading_action", None)
     loading = _loading_presentation(loading_action)
