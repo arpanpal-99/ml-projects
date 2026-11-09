@@ -1,3 +1,5 @@
+"""Read, validate, and join the movie and credits source CSV files."""
+
 from __future__ import annotations
 
 import logging
@@ -18,6 +20,7 @@ class DataValidationError(ValueError):
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
+    """Read one CSV with explicit errors for missing or malformed source files."""
     if not path.is_file():
         raise FileNotFoundError(
             f"Required dataset not found: {path}. Download the TMDB 5000 Movies "
@@ -30,12 +33,14 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 
 def _validate_columns(frame: pd.DataFrame, required: set[str], label: str) -> None:
+    """Reject an input table that does not contain its required data contract."""
     missing = sorted(required - set(frame.columns))
     if missing:
         raise DataValidationError(f"{label} CSV is missing required columns: {', '.join(missing)}.")
 
 
 def _canonicalize_ids(frame: pd.DataFrame, column: str, label: str) -> pd.DataFrame:
+    """Convert IDs to integers and reject invalid or duplicate identifiers."""
     result = frame.copy()
     numeric_ids = pd.to_numeric(result[column], errors="coerce")
     invalid = numeric_ids.isna() | (numeric_ids % 1 != 0)
@@ -59,6 +64,7 @@ def _canonicalize_ids(frame: pd.DataFrame, column: str, label: str) -> pd.DataFr
 def load_and_merge_data(
     raw_data_dir: Path,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Join movie metadata to credits and return row-level input diagnostics."""
     movies = _read_csv(raw_data_dir / MOVIES_FILENAME)
     credits = _read_csv(raw_data_dir / CREDITS_FILENAME)
     _validate_columns(movies, MOVIE_COLUMNS, "Movies")

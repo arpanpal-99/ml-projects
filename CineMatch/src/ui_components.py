@@ -572,6 +572,7 @@ def apply_product_styles() -> None:
 
 
 def metadata_list(value: object) -> list[str]:
+    """Normalize list-like catalogue metadata for display."""
     if isinstance(value, np.ndarray):
         value = value.tolist()
     if isinstance(value, (list, tuple, set)):
@@ -580,16 +581,19 @@ def metadata_list(value: object) -> list[str]:
 
 
 def display_name(value: object) -> str:
+    """Format an underscore-delimited metadata value as a readable label."""
     return str(value).replace("_", " ").strip().title()
 
 
 def movie_year(movie: Mapping[str, Any]) -> str:
+    """Return a four-digit release year or an em dash when unavailable."""
     value = movie.get("release_date", "")
     year = str(value)[:4] if value else ""
     return year if year.isdigit() else "—"
 
 
 def short_text(value: object, limit: int) -> str:
+    """Trim long text to a display limit and mark truncated content."""
     text = value.strip() if isinstance(value, str) else ""
     if len(text) <= limit:
         return text
@@ -597,6 +601,7 @@ def short_text(value: object, limit: int) -> str:
 
 
 def numeric_value(movie: Mapping[str, Any], key: str) -> float | None:
+    """Read a finite numeric value from a movie record, if available."""
     value = movie.get(key)
     if value is None:
         return None
@@ -610,6 +615,7 @@ def numeric_value(movie: Mapping[str, Any], key: str) -> float | None:
 def poster_url(
     movie: Mapping[str, Any], tmdb: TMDBClient, *, include_remote_fallback: bool = False
 ) -> str | None:
+    """Resolve a local poster path, optionally querying TMDB when it is missing."""
     path = movie.get("poster_path")
     if (not isinstance(path, str) or not path.strip()) and include_remote_fallback:
         details = tmdb.get_movie_details(int(movie["id"]))
@@ -618,6 +624,7 @@ def poster_url(
 
 
 def _poster_markup(movie: Mapping[str, Any], tmdb: TMDBClient, *, fallback: bool) -> str:
+    """Render a TMDB image or a deterministic accessible title-cover fallback."""
     title = html.escape(str(movie.get("title", "Movie")))
     url = poster_url(movie, tmdb, include_remote_fallback=fallback)
     if url:
@@ -643,6 +650,7 @@ def _poster_markup(movie: Mapping[str, Any], tmdb: TMDBClient, *, fallback: bool
 
 
 def _pills(movie: Mapping[str, Any], *, match_score: float | None = None) -> str:
+    """Build escaped rating, match-score, and genre badges for a movie."""
     pills: list[str] = []
     rating = numeric_value(movie, "vote_average")
     if rating and rating > 0:

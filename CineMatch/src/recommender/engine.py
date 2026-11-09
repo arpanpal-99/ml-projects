@@ -1,3 +1,5 @@
+"""Search and rank movies using sparse text features and catalogue signals."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -9,7 +11,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 class MovieRecommender:
+    """Query a movie catalogue and rank content-based recommendation candidates."""
+
     def __init__(self, movies: pd.DataFrame, vectorizer: object, matrix: sparse.spmatrix) -> None:
+        """Validate row alignment and build fast movie-ID and feature-row lookups."""
         if len(movies) != matrix.shape[0]:
             raise ValueError("Movie table and feature matrix row counts must match.")
         if movies["id"].isna().any() or movies["id"].duplicated().any():
@@ -22,6 +27,7 @@ class MovieRecommender:
 
     @staticmethod
     def _validate_limit(limit: int, name: str = "k") -> int:
+        """Require result limits to be positive integers, excluding booleans."""
         if isinstance(limit, bool) or not isinstance(limit, int | np.integer) or limit < 1:
             raise ValueError(f"{name} must be a positive integer.")
         return int(limit)
@@ -37,9 +43,11 @@ class MovieRecommender:
 
     @staticmethod
     def _display_name(value: str) -> str:
+        """Turn normalized underscore-delimited values into readable labels."""
         return value.replace("_", " ").strip().title()
 
     def _numeric_values(self, column: str, default: float = 0.0) -> pd.Series:
+        """Return a numeric catalogue column, filling missing or invalid values."""
         return pd.to_numeric(
             self.movies.get(column, pd.Series(index=self.movies.index, dtype=float)),
             errors="coerce",
@@ -68,6 +76,7 @@ class MovieRecommender:
         return quality, popularity
 
     def _genre_mask(self, genre: str | None) -> np.ndarray:
+        """Build a Boolean mask for all movies or for the requested genre."""
         if genre is None or not str(genre).strip():
             return np.ones(len(self.movies), dtype=bool)
         expected = str(genre).strip().casefold().replace(" ", "_")
@@ -79,6 +88,7 @@ class MovieRecommender:
         ).to_numpy(dtype=bool)
 
     def get_movie(self, movie_id: int) -> pd.Series | None:
+        """Return a copy of one movie row, or None when its ID is not in the catalog."""
         row = self._id_to_row.get(int(movie_id))
         return None if row is None else self.movies.iloc[row].copy()
 
@@ -103,7 +113,7 @@ class MovieRecommender:
         genre: str | None = None,
         min_votes: int | None = None,
     ) -> pd.DataFrame:
-        """Rank catalogue favourites using a Bayesian rating instead of randomness."""
+        """Rank catalogue favourites using Bayesian quality and stable tie-breaks."""
         k = self._validate_limit(k)
         if min_votes is not None and (
             isinstance(min_votes, bool) or not isinstance(min_votes, int | np.integer) or min_votes < 0
@@ -158,6 +168,8 @@ class MovieRecommender:
         )
 
     def find_movies(self, query: str, limit: int = 20) -> pd.DataFrame:
+        """Find title matches and order exact/prefix matches ahead of substring hits."""
+        """Find title matches, ordering exact and prefix matches ahead of others."""
         limit = self._validate_limit(limit, "limit")
         normalized_query = str(query).strip().casefold()
         candidates = self.movies.copy()
@@ -215,6 +227,7 @@ class MovieRecommender:
         )
 
     def recommend(self, movie_id: int, k: int = 5) -> pd.DataFrame:
+        """Return the closest positive-cosine matches for one movie ID."""
         k = self._validate_limit(k)
         movie_id = int(movie_id)
         row = self._id_to_row.get(movie_id)

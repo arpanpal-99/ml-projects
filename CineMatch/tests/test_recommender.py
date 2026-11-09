@@ -1,3 +1,5 @@
+"""Tests for movie search, similarity ranking, discovery scores, and explanations."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -9,6 +11,7 @@ from src.recommender.engine import MovieRecommender
 
 @pytest.fixture
 def recommender():
+    """Create a small content-feature catalog for search and cosine tests."""
     movies = pd.DataFrame(
         [
             {
@@ -38,6 +41,7 @@ def recommender():
 
 @pytest.fixture
 def discovery_recommender():
+    """Create a varied rated catalog for discovery ranking tests."""
     movies = pd.DataFrame(
         [
             {

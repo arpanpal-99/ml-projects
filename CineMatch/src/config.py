@@ -1,3 +1,5 @@
+"""Project paths and validated environment-based settings for CineMatch."""
+
 from __future__ import annotations
 
 import os
@@ -9,6 +11,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 @dataclass(frozen=True)
 class Settings:
+    """Resolved paths and tunable limits shared by the build and app workflows."""
+
     project_root: Path = PROJECT_ROOT
     raw_data_dir: Path = PROJECT_ROOT / "data" / "raw"
     processed_data_dir: Path = PROJECT_ROOT / "data" / "processed"
@@ -19,6 +23,7 @@ class Settings:
 
     @classmethod
     def from_environment(cls) -> Settings:
+        """Create settings from CINEMATCH_* variables, validating numeric limits."""
         root = Path(os.getenv("CINEMATCH_ROOT", str(PROJECT_ROOT))).expanduser().resolve()
         max_features = int(os.getenv("CINEMATCH_MAX_FEATURES", "5000"))
         parse_failure_rate = float(os.getenv("CINEMATCH_MAX_PARSE_FAILURE_RATE", "0.05"))

@@ -1,3 +1,5 @@
+"""Convert normalized movie tags into sparse bag-of-words feature vectors."""
+
 from __future__ import annotations
 
 from scipy import sparse
@@ -7,6 +9,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 def build_feature_matrix(
     tags: list[str], max_features: int = 5000
 ) -> tuple[CountVectorizer, sparse.csr_matrix]:
+    """Fit a CountVectorizer and return the vocabulary and movie-by-term matrix."""
     if max_features < 1:
         raise ValueError("max_features must be positive.")
     if not tags:

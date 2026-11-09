@@ -1,3 +1,5 @@
+"""Shared pytest fixtures providing small, offline movie and credits datasets."""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +10,7 @@ import pytest
 
 @pytest.fixture
 def raw_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return three synthetic movie rows and their corresponding credits."""
     movies = pd.DataFrame(
         [
             {

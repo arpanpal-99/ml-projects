@@ -1,3 +1,5 @@
+"""Tests for artifact round-trips and validation of saved model files."""
+
 from __future__ import annotations
 
 import json

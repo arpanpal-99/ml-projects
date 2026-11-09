@@ -1,3 +1,5 @@
+"""Optional TMDB lookups for movie details and poster images."""
+
 from __future__ import annotations
 
 import logging
@@ -16,6 +18,8 @@ FAILED_LOOKUP_CACHE_TTL_SECONDS = 30
 
 
 class TMDBClient:
+    """Fetch optional TMDB movie details with bounded timeouts and an in-memory cache."""
+
     def __init__(
         self,
         api_key: str | None = None,
@@ -24,6 +28,7 @@ class TMDBClient:
         cache_size: int = 256,
         session: requests.Session | None = None,
     ) -> None:
+        """Configure API credentials, HTTP session, timeouts, and cache limits."""
         self.api_key = api_key or os.getenv("TMDB_API_KEY")
         self.timeout = timeout
         self.cache_ttl_seconds = cache_ttl_seconds
@@ -33,6 +38,7 @@ class TMDBClient:
         self._lock = threading.Lock()
 
     def _cache_details(self, movie_id: int, details: dict[str, Any] | None, ttl: int) -> None:
+        """Store a defensive copy and evict least-recently-used entries past capacity."""
         with self._lock:
             cached_details = details.copy() if details else None
             self._cache[movie_id] = (time.monotonic() + ttl, cached_details)
@@ -42,6 +48,7 @@ class TMDBClient:
 
     @staticmethod
     def poster_url(poster_path: Any, size: str = "w500") -> str | None:
+        """Build a supported TMDB image URL, or return None for an empty path."""
         if not isinstance(poster_path, str) or not poster_path.strip():
             return None
         if size not in {"w92", "w154", "w185", "w342", "w500", "w780", "original"}:
@@ -49,6 +56,7 @@ class TMDBClient:
         return f"{TMDB_IMAGE_BASE}/{size}/{poster_path.lstrip('/')}"
 
     def get_movie_details(self, movie_id: int) -> dict[str, Any] | None:
+        """Fetch, validate, and cache details; return None if lookup is unavailable."""
         if not self.api_key:
             return None
         movie_id = int(movie_id)

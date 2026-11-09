@@ -1,3 +1,5 @@
+"""Tests for sparse bag-of-words feature construction and invalid text inputs."""
+
 from __future__ import annotations
 
 import pytest

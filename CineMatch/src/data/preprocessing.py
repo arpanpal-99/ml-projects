@@ -1,3 +1,5 @@
+"""Parse source metadata and prepare normalized text used by the content model."""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +16,7 @@ WHITESPACE = re.compile(r"\s+")
 
 
 def parse_json_list(value: Any) -> tuple[list[dict[str, Any]], bool]:
+    """Parse a JSON-like metadata cell and report whether its format was invalid."""
     if value is None:
         return [], False
     if isinstance(value, list):
@@ -38,6 +41,7 @@ def parse_json_list(value: Any) -> tuple[list[dict[str, Any]], bool]:
 
 
 def normalize_text(value: Any) -> str:
+    """Lowercase text and collapse whitespace while treating missing values as empty."""
     if value is None:
         return ""
     missing = pd.isna(value)
@@ -47,10 +51,12 @@ def normalize_text(value: Any) -> str:
 
 
 def normalize_name(value: Any) -> str:
+    """Normalize a person or category name into a lowercase underscore token."""
     return "_".join(normalize_text(value).split())
 
 
 def _names(items: list[dict[str, Any]], limit: int | None = None) -> list[str]:
+    """Extract non-empty normalized names, optionally keeping only the first items."""
     selected = items if limit is None else items[:limit]
     return [
         normalize_name(item.get("name")) for item in selected if normalize_name(item.get("name"))
@@ -62,6 +68,7 @@ def preprocess_movies(
     principal_cast_size: int = 5,
     max_parse_failure_rate: float = 0.05,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Add normalized metadata and one combined searchable tag string per movie."""
     if principal_cast_size < 1:
         raise ValueError("principal_cast_size must be positive.")
     if not 0 <= max_parse_failure_rate <= 1:

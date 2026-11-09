@@ -1,3 +1,5 @@
+"""Tests for CSV validation, movie-credit joins, and source-data diagnostics."""
+
 from __future__ import annotations
 
 import pandas as pd

@@ -1,3 +1,5 @@
+"""Tests for structured metadata parsing and normalized recommendation tags."""
+
 from __future__ import annotations
 
 import pandas as pd

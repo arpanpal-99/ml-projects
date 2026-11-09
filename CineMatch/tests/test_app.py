@@ -1,3 +1,5 @@
+"""Streamlit UI tests for discovery shelves, dialogs, and session interactions."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,6 +14,7 @@ from src.services.tmdb_client import TMDBClient
 
 
 def _catalogue() -> pd.DataFrame:
+    """Create the small movie catalog used by Streamlit interaction tests."""
     return pd.DataFrame(
         [
             {
@@ -67,6 +70,7 @@ def _catalogue() -> pd.DataFrame:
 
 
 def _app(monkeypatch, tmp_path) -> AppTest:
+    """Build temporary artifacts and run the Streamlit app in AppTest."""
     movies = _catalogue()
     vectorizer, matrix = build_feature_matrix(movies["tags"].tolist())
     save_artifacts(movies, vectorizer, matrix, tmp_path, {}, 5000)
@@ -80,10 +84,12 @@ def _app(monkeypatch, tmp_path) -> AppTest:
 
 
 def _button(app: AppTest, key: str):
+    """Find a rendered button by its stable Streamlit key."""
     return next(button for button in app.button if button.key == key)
 
 
 def _contains_markdown(app: AppTest, text: str) -> bool:
+    """Check whether any rendered Markdown block contains the requested text."""
     return any(text in item.value for item in app.markdown)
 
 

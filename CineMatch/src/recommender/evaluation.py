@@ -1,3 +1,5 @@
+"""Small inspection helpers for example recommendation outputs."""
+
 from __future__ import annotations
 
 import pandas as pd

@@ -1,3 +1,5 @@
+"""Offline tests for TMDB URL construction, caching, and graceful API failures."""
+
 from __future__ import annotations
 
 from unittest.mock import Mock

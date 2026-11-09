@@ -201,11 +201,19 @@ src/data/                      CSV validation, metadata parsing, and tags
 src/features/                  CountVectorizer feature construction
 src/recommender/                Ranking and artifact validation/persistence
 src/services/                  Optional TMDB client
-scripts/build_artifacts.py     Explicit offline build command
+ml_pipeline.py                 Commented ML build/load/recommendation workflow
+app.py                         Streamlit UI and session interactions
+scripts/build_artifacts.py     CLI entry point for the offline model build
 tests/                          Offline unit and artifact tests
 data/raw/                       User-supplied source CSVs (not committed)
 artifacts/                      Generated model files (not committed)
 ```
+
+The ML workflow is deliberately separate from the Streamlit interface. Start with
+`ml_pipeline.py` to follow how source data becomes normalized movie features and
+how those features are used to rank recommendations. The detailed implementations
+remain in `src/data/`, `src/features/`, and `src/recommender/`; `app.py` calls the
+pipeline and focuses on the visual experience and browser-session features.
 
 ## Deployment
 

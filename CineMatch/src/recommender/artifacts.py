@@ -1,3 +1,5 @@
+"""Persist and validate the movie table, vectorizer, feature matrix, and manifest."""
+
 from __future__ import annotations
 
 import hashlib
@@ -27,11 +29,13 @@ class ArtifactError(ValueError):
 
 
 def ordered_ids_checksum(ids: pd.Series) -> str:
+    """Hash the ordered movie IDs so row-to-matrix alignment can be verified."""
     payload = ",".join(str(int(movie_id)) for movie_id in ids.tolist()).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
 def _file_sha256(path: Path) -> str:
+    """Compute a streaming SHA-256 digest for an artifact file."""
     digest = hashlib.sha256()
     with path.open("rb") as file:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
@@ -40,6 +44,7 @@ def _file_sha256(path: Path) -> str:
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write a JSON manifest through a temporary file before replacing the target."""
     with tempfile.NamedTemporaryFile(
         "w", encoding="utf-8", dir=path.parent, delete=False, suffix=".tmp"
     ) as file:
@@ -57,6 +62,7 @@ def save_artifacts(
     build_summary: dict[str, Any],
     max_features: int,
 ) -> dict[str, Any]:
+    """Write model outputs and a manifest containing dimensions and file hashes."""
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     paths = {key: artifacts_dir / name for key, name in ARTIFACT_FILENAMES.items()}
     with tempfile.TemporaryDirectory(prefix=".cinematch-build-", dir=artifacts_dir) as temp:
@@ -106,6 +112,7 @@ def save_artifacts(
 
 
 def load_artifacts(artifacts_dir: Path) -> tuple[pd.DataFrame, Any, sparse.csr_matrix]:
+    """Load artifacts only after checking file integrity and model consistency."""
     paths = {key: artifacts_dir / name for key, name in ARTIFACT_FILENAMES.items()}
     missing = [str(path) for path in paths.values() if not path.is_file()]
     if missing:
