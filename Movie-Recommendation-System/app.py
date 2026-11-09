@@ -19,7 +19,7 @@ from ml_pipeline import (
 )
 
 PROJECT_DIR = Path(__file__).resolve().parent
-TMDB_ENV_FILE = PROJECT_DIR.parent / "CineMatch" / ".env"
+TMDB_ENV_FILE = PROJECT_DIR / ".env"
 TMDB_API_BASE = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 
@@ -31,10 +31,11 @@ st.set_page_config(
 
 
 def _get_tmdb_api_key() -> str | None:
-    """Read the TMDB API key from the environment or neighboring CineMatch .env."""
-    # Keep credentials in the existing local environment file, not in application code.
-    load_dotenv(TMDB_ENV_FILE, override=False)
-    return os.getenv("TMDB_API_KEY")
+    """Read the TMDB API key from this project's local environment file."""
+    # Prefer this project's key over any TMDB_API_KEY inherited from another app.
+    load_dotenv(TMDB_ENV_FILE, override=True)
+    api_key = os.getenv("TMDB_API_KEY", "").strip()
+    return api_key or None
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -195,7 +196,7 @@ def main() -> None:
             tmdb_details: dict[str, Any] = {}
             if not api_key:
                 st.warning(
-                    f"TMDB_API_KEY was not found in the environment or {TMDB_ENV_FILE}."
+                    f"Set TMDB_API_KEY in this project's {TMDB_ENV_FILE} to load movie details."
                 )
             else:
                 try:

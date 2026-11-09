@@ -20,6 +20,18 @@ python -m streamlit run app.py
 Using `python -m streamlit` starts Streamlit through the selected Python
 environment, avoiding stale Windows console launchers.
 
+## TMDB API key
+
+Movie details and posters use the TMDB API. Add your key to this project's
+`.env` file:
+
+```text
+TMDB_API_KEY=your_tmdb_api_key_here
+```
+
+The local `.env` is ignored by Git. `.env.example` shows the required variable
+without containing a real credential.
+
 ## Dataset
 
 Place these files in the project's `data/raw/` directory:
@@ -56,6 +68,8 @@ movie's scores at a time instead of storing a full all-pairs similarity matrix.
 - `app.py` - Streamlit interface, styling, and movie detail display.
 - `ml_pipeline.py` - dataset loading, feature engineering, and recommendation
   ranking.
+- `.env.example` - the TMDB environment variable template; put your key in the
+  ignored `.env` file.
 - `requirements.txt` - the direct runtime dependencies.
 - `data/raw/.gitkeep` - keeps the local dataset directory visible without
   committing the dataset.
