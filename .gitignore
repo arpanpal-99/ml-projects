@@ -1,0 +1,25 @@
+# Python environments, bytecode, and test/lint caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local secrets and logs
+.env
+.env.*
+!.env.example
+**/.streamlit/secrets.toml
+*.log
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Coverage and common Python build outputs
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
